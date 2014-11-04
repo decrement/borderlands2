@@ -12,7 +12,8 @@ import struct
 import sys
 
 
-class BL2Error(Exception): pass
+class BL2Error(Exception):
+    pass
 
 
 class ReadBitstream(object):
@@ -33,8 +34,8 @@ class ReadBitstream(object):
         i = self.i
         end = i + n
         chunk = s[i >> 3: (end + 7) >> 3]
-        value = ord(chunk[0]) &~ (0xff00 >> (i & 7))
-        for c in chunk[1: ]:
+        value = ord(chunk[0]) & ~ (0xff00 >> (i & 7))
+        for c in chunk[1:]:
             value = (value << 8) | ord(c)
         if (end & 7) != 0:
             value = value >> (8 - (end & 7))
@@ -49,6 +50,7 @@ class ReadBitstream(object):
             return byte
         byte = (byte << 8) | ord(self.s[(i >> 3) + 1])
         return (byte >> (8 - (i & 7))) & 0xff
+
 
 class WriteBitstream(object):
 
@@ -76,7 +78,7 @@ class WriteBitstream(object):
             shift = n - (i + 1)
             n = n - (i + 1)
             byte = byte | (b >> shift)
-            b = b &~ (byte << shift)
+            b = b & ~ (byte << shift)
             s = s + chr(byte)
             byte = 0
             i = 7
@@ -109,6 +111,7 @@ def read_huffman_tree(b):
     else:
         return (None, b.read_byte())
 
+
 def write_huffman_tree(node, b):
     if type(node[1]) is int:
         b.write_bit(1)
@@ -117,6 +120,7 @@ def write_huffman_tree(node, b):
         b.write_bit(0)
         write_huffman_tree(node[1][0], b)
         write_huffman_tree(node[1][1], b)
+
 
 def make_huffman_tree(data):
     frequencies = [0] * 256
@@ -128,10 +132,11 @@ def make_huffman_tree(data):
 
     while len(nodes) > 1:
         l, r = nodes[: 2]
-        nodes = nodes[2: ]
+        nodes = nodes[2:]
         insort(nodes, [l[0] + r[0], [l, r]])
 
     return nodes[0]
+
 
 def invert_tree(node, code=0, bits=0):
     if type(node[1]) is int:
@@ -141,6 +146,7 @@ def invert_tree(node, code=0, bits=0):
         d.update(invert_tree(node[1][0], code << 1, bits + 1))
         d.update(invert_tree(node[1][1], (code << 1) | 1, bits + 1))
         return d
+
 
 def huffman_decompress(tree, bitstream, size):
     output = ""
@@ -154,6 +160,7 @@ def huffman_decompress(tree, bitstream, size):
                 break
     return output
 
+
 def huffman_compress(encoding, data, bitstream):
     for c in data:
         code, nbits = encoding[c]
@@ -164,6 +171,7 @@ item_sizes = (
     (8, 17, 20, 11, 7, 7, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16),
     (8, 13, 20, 11, 7, 7, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17)
 )
+
 
 def pack_item_values(is_weapon, values):
     i = 0
@@ -183,6 +191,7 @@ def pack_item_values(is_weapon, values):
         bytes[i >> 3] |= (value & 0xff)
     return "".join(map(chr, bytes[: (i + 7) >> 3]))
 
+
 def unpack_item_values(is_weapon, data):
     i = 8
     data = " " + data
@@ -196,17 +205,20 @@ def unpack_item_values(is_weapon, data):
         value = 0
         for b in data[j >> 3: (i >> 3) - 1: -1]:
             value = (value << 8) | ord(b)
-        values.append((value >> (i & 7)) &~ (0xff << size))
+        values.append((value >> (i & 7)) & ~ (0xff << size))
         i = j
     return values
 
+
 def rotate_data_right(data, steps):
     steps = steps % len(data)
-    return data[-steps: ] + data[: -steps]
+    return data[-steps:] + data[: -steps]
+
 
 def rotate_data_left(data, steps):
     steps = steps % len(data)
-    return data[steps: ] + data[: steps]
+    return data[steps:] + data[: steps]
+
 
 def xor_data(data, key):
     key = key & 0xffffffff
@@ -215,6 +227,7 @@ def xor_data(data, key):
         key = (key * 279470273) % 4294967291
         output += chr((ord(c) ^ key) & 0xff)
     return output
+
 
 def wrap_item(is_weapon, values, key):
     item = pack_item_values(is_weapon, values)
@@ -225,15 +238,17 @@ def wrap_item(is_weapon, values, key):
     body = xor_data(rotate_data_left(checksum + item, key & 31), key >> 5)
     return header + body
 
+
 def unwrap_item(data):
     version_type, key = struct.unpack(">Bi", data[: 5])
     is_weapon = version_type >> 7
-    raw = rotate_data_right(xor_data(data[5: ], key >> 5), key & 31)
-    return is_weapon, unpack_item_values(is_weapon, raw[2: ]), key
+    raw = rotate_data_right(xor_data(data[5:], key >> 5), key & 31)
+    return is_weapon, unpack_item_values(is_weapon, raw[2:]), key
+
 
 def replace_raw_item_key(data, key):
     old_key = struct.unpack(">i", data[1: 5])[0]
-    item = rotate_data_right(xor_data(data[5: ], old_key >> 5), old_key & 31)[2: ]
+    item = rotate_data_right(xor_data(data[5:], old_key >> 5), old_key & 31)[2:]
     header = data[0] + struct.pack(">i", key)
     padding = "\xff" * (33 - len(item))
     h = binascii.crc32(header + "\xff\xff" + item + padding) & 0xffffffff
@@ -253,11 +268,13 @@ def read_varint(f):
         offset = offset + 7
     return value
 
+
 def write_varint(f, i):
     while i > 0x7f:
         f.write(chr(0x80 | (i & 0x7f)))
         i = i >> 7
     f.write(chr(i))
+
 
 def read_protobuf(data):
     fields = {}
@@ -270,6 +287,7 @@ def read_protobuf(data):
         value = read_protobuf_value(bytestream, wire_type)
         fields.setdefault(field_number, []).append([wire_type, value])
     return fields
+
 
 def read_protobuf_value(b, wire_type):
     if wire_type == 0:
@@ -285,12 +303,14 @@ def read_protobuf_value(b, wire_type):
         raise BL2Error("Unsupported wire type " + str(wire_type))
     return value
 
+
 def read_repeated_protobuf_value(data, wire_type):
     b = StringIO(data)
     values = []
     while b.tell() < len(data):
         values.append(read_protobuf_value(b, wire_type))
     return values
+
 
 def write_protobuf(data):
     b = StringIO()
@@ -311,6 +331,7 @@ def write_protobuf(data):
             write_protobuf_value(b, wire_type, value)
     return b.getvalue()
 
+
 def write_protobuf_value(b, wire_type, value):
     if wire_type == 0:
         write_varint(b, value)
@@ -328,11 +349,13 @@ def write_protobuf_value(b, wire_type, value):
     else:
         raise BL2Error("Unsupported wire type " + str(wire_type))
 
+
 def write_repeated_protobuf_value(data, wire_type):
     b = StringIO()
     for value in data:
         write_protobuf_value(b, wire_type, value)
     return b.getvalue()
+
 
 def parse_zigzag(i):
     if i & 1:
@@ -380,6 +403,7 @@ def apply_structure(pbdata, s):
             fields["_raw"][k] = safe_values
     return fields
 
+
 def remove_structure(data, inv):
     pbdata = {}
     pbdata.update(data.get("_raw", {}))
@@ -423,8 +447,10 @@ def remove_structure(data, inv):
             raise Exception("Invalid mapping %r for %r: %r" % (mapping, k, value))
     return pbdata
 
+
 def guess_wire_type(value):
     return 2 if isinstance(value, basestring) else 0
+
 
 def invert_structure(structure):
     inv = {}
@@ -433,19 +459,23 @@ def invert_structure(structure):
             if type(v[2]) is dict:
                 inv[v[0]] = (k, v[1], invert_structure(v[2]))
             else:
-                inv[v[0]] = (k, ) + v[1: ]
+                inv[v[0]] = (k, ) + v[1:]
         else:
             inv[v] = k
     return inv
 
+
 def unwrap_bytes(value):
     return [ord(d) for d in value]
+
 
 def wrap_bytes(value):
     return "".join(map(chr, value))
 
+
 def unwrap_float(v):
     return struct.unpack("<f", struct.pack("<I", v))[0]
+
 
 def wrap_float(v):
     return [5, struct.unpack("<I", struct.pack("<f", v))[0]]
@@ -455,9 +485,11 @@ black_market_keys = (
     "sniper", "grenade", "backpack", "bank"
 )
 
+
 def unwrap_black_market(value):
     sdus = read_repeated_protobuf_value(value, 0)
     return dict(zip(black_market_keys, sdus))
+
 
 def wrap_black_market(value):
     sdus = [value[k] for k in black_market_keys[: len(value)]]
@@ -467,6 +499,7 @@ item_header_sizes = (
     (("type", 8), ("balance", 10), ("manufacturer", 7)),
     (("type", 6), ("balance", 10), ("manufacturer", 7))
 )
+
 
 def unwrap_item_info(value):
     is_weapon, item, key = unwrap_item(value)
@@ -478,19 +511,20 @@ def unwrap_item_info(value):
     }
     for i, (k, bits) in enumerate(item_header_sizes[is_weapon]):
         lib = item[1 + i] >> bits
-        asset = item[1 + i] &~ (lib << bits)
+        asset = item[1 + i] & ~ (lib << bits)
         data[k] = {"lib": lib, "asset": asset}
     bits = 10 + is_weapon
     parts = []
-    for value in item[6: ]:
+    for value in item[6:]:
         if value is None:
             parts.append(None)
         else:
             lib = value >> bits
-            asset = value &~ (lib << bits)
+            asset = value & ~ (lib << bits)
             parts.append({"lib": lib, "asset": asset})
     data["parts"] = parts
     return data
+
 
 def wrap_item_info(value):
     item = [value["set"]]
@@ -514,47 +548,47 @@ save_structure = {
     6: ("currency", True, 0),
     7: "playthroughs_completed",
     8: ("skills", True, {
-            1: "name",
-            2: "level",
-            3: "unknown3",
-            4: "unknown4"
+        1: "name",
+        2: "level",
+        3: "unknown3",
+        4: "unknown4"
         }),
     11: ("resources", True, {
-            1: "resource",
-            2: "pool",
-            3: ("amount", False, (unwrap_float, wrap_float)),
-            4: "level"
+        1: "resource",
+        2: "pool",
+        3: ("amount", False, (unwrap_float, wrap_float)),
+        4: "level"
         }),
     13: ("sizes", False, {
-            1: "inventory",
-            2: "weapon_slots",
-            3: "weapon_slots_shown"
+        1: "inventory",
+        2: "weapon_slots",
+        3: "weapon_slots_shown"
         }),
     15: ("stats", False, (unwrap_bytes, wrap_bytes)),
     16: ("active_fast_travel", True, None),
     17: "last_fast_travel",
     18: ("missions", True, {
-            1: "playthrough",
-            2: "active",
-            3: ("data", True, {
-                1: "name",
-                2: "status",
-                3: "is_from_dlc",
-                4: "dlc_id",
-                5: ("unknown5", False, (unwrap_bytes, wrap_bytes)),
-                6: "unknown6",
-                7: ("unknown7", False, (unwrap_bytes, wrap_bytes)),
-                8: "unknown8",
-                9: "unknown9",
-                10: "unknown10",
-                11: "level",
+        1: "playthrough",
+        2: "active",
+        3: ("data", True, {
+            1: "name",
+            2: "status",
+            3: "is_from_dlc",
+            4: "dlc_id",
+            5: ("unknown5", False, (unwrap_bytes, wrap_bytes)),
+            6: "unknown6",
+            7: ("unknown7", False, (unwrap_bytes, wrap_bytes)),
+            8: "unknown8",
+            9: "unknown9",
+            10: "unknown10",
+            11: "level",
             }),
         }),
     19: ("appearance", False, {
-            1: "name",
-            2: ("color1", False, {1: "a", 2: "r", 3: "g", 4: "b"}),
-            3: ("color2", False, {1: "a", 2: "r", 3: "g", 4: "b"}),
-            4: ("color3", False, {1: "a", 2: "r", 3: "g", 4: "b"}),
+        1: "name",
+        2: ("color1", False, {1: "a", 2: "r", 3: "g", 4: "b"}),
+        3: ("color2", False, {1: "a", 2: "r", 3: "g", 4: "b"}),
+        4: ("color3", False, {1: "a", 2: "r", 3: "g", 4: "b"}),
         }),
     20: "save_game_id",
     21: "mission_number",
@@ -563,52 +597,52 @@ save_structure = {
     25: "time_played",
     26: "save_timestamp",
     29: ("game_stages", True, {
-            1: "name",
-            2: "level",
-            3: "is_from_dlc",
-            4: "dlc_id",
-            5: "playthrough",
+        1: "name",
+        2: "level",
+        3: "is_from_dlc",
+        4: "dlc_id",
+        5: "playthrough",
         }),
     30: ("areas", True, {
-            1: "name",
-            2: "unknown2"
+        1: "name",
+        2: "unknown2"
         }),
     34: ("id", False, {
-            1: ("a", False, 5),
-            2: ("b", False, 5),
-            3: ("c", False, 5),
-            4: ("d", False, 5),
+        1: ("a", False, 5),
+        2: ("b", False, 5),
+        3: ("c", False, 5),
+        4: ("d", False, 5),
         }),
     35: ("wearing", True, None),
     36: ("black_market", False, (unwrap_black_market, wrap_black_market)),
     37: "active_mission",
     38: ("challenges", True, {
-            1: "name",
-            2: "is_from_dlc",
-            3: "dlc_id"
+        1: "name",
+        2: "is_from_dlc",
+        3: "dlc_id"
         }),
     41: ("bank", True, {
-            1: ("data", False, (unwrap_item_info, wrap_item_info)),
+        1: ("data", False, (unwrap_item_info, wrap_item_info)),
         }),
     43: ("lockouts", True, {
-            1: "name",
-            2: "time",
-            3: "is_from_dlc",
-            4: "dlc_id"
+        1: "name",
+        2: "time",
+        3: "is_from_dlc",
+        4: "dlc_id"
         }),
     46: ("explored_areas", True, None),
     49: "active_playthrough",
     53: ("items", True, {
-            1: ("data", False, (unwrap_item_info, wrap_item_info)),
-            2: "unknown2",
-            3: "is_equipped",
-            4: "star"
+        1: ("data", False, (unwrap_item_info, wrap_item_info)),
+        2: "unknown2",
+        3: "is_equipped",
+        4: "star"
         }),
     54: ("weapons", True, {
-            1: ("data", False, (unwrap_item_info, wrap_item_info)),
-            2: "slot",
-            3: "star",
-            4: "unknown4",
+        1: ("data", False, (unwrap_item_info, wrap_item_info)),
+        2: "slot",
+        3: "star",
+        4: "unknown4",
         }),
     55: "stats_bonuses_disabled",
     56: "bank_size",
@@ -619,10 +653,10 @@ def unwrap_player_data(data):
     if data[: 4] == "CON ":
         raise BL2Error("You need to use a program like Horizon or Modio to extract the SaveGame.sav file first")
 
-    if data[: 20] != hashlib.sha1(data[20: ]).digest():
+    if data[: 20] != hashlib.sha1(data[20:]).digest():
         raise BL2Error("Invalid save file")
 
-    data = lzo1x_decompress("\xf0" + data[20: ])
+    data = lzo1x_decompress("\xf0" + data[20:])
     size, wsg, version = struct.unpack(">I3sI", data[: 11])
     if version != 2 and version != 0x02000000:
         raise BL2Error("Unknown save version " + str(version))
@@ -632,7 +666,7 @@ def unwrap_player_data(data):
     else:
         crc, size = struct.unpack("<II", data[11: 19])
 
-    bitstream = ReadBitstream(data[19: ])
+    bitstream = ReadBitstream(data[19:])
     tree = read_huffman_tree(bitstream)
     player = huffman_decompress(tree, bitstream, size)
 
@@ -640,6 +674,7 @@ def unwrap_player_data(data):
         raise BL2Error("CRC check failed")
 
     return player
+
 
 def wrap_player_data(player, endian=1):
     crc = binascii.crc32(player) & 0xffffffff
@@ -656,7 +691,7 @@ def wrap_player_data(player, endian=1):
     else:
         header = header + struct.pack("<III", 2, crc, len(player))
 
-    data = lzo1x_1_compress(header + data)[1: ]
+    data = lzo1x_1_compress(header + data)[1:]
 
     return hashlib.sha1(data).digest() + data
 
@@ -668,6 +703,7 @@ def expand_zeroes(src, ip, extra):
     v = ((ip - start) * 255) + src[ip]
     return v + extra, ip + 1
 
+
 def copy_earlier(b, offset, n):
     i = len(b) - offset
     end = i + n
@@ -677,65 +713,83 @@ def copy_earlier(b, offset, n):
         n = n - len(chunk)
         b.extend(chunk)
 
+
 def lzo1x_decompress(s):
     dst = bytearray()
     src = bytearray(s)
     ip = 5
 
-    t = src[ip]; ip += 1
+    t = src[ip]
+    ip += 1
     if t > 17:
         t = t - 17
-        dst.extend(src[ip: ip + t]); ip += t
-        t = src[ip]; ip += 1
+        dst.extend(src[ip: ip + t])
+        ip += t
+        t = src[ip]
+        ip += 1
     elif t < 16:
         if t == 0:
             t, ip = expand_zeroes(src, ip, 15)
-        dst.extend(src[ip: ip + t + 3]); ip += t + 3
-        t = src[ip]; ip += 1
+        dst.extend(src[ip: ip + t + 3])
+        ip += t + 3
+        t = src[ip]
+        ip += 1
 
     while 1:
         while 1:
             if t >= 64:
-                copy_earlier(dst, 1 + ((t >> 2) & 7) + (src[ip] << 3), (t >> 5) + 1); ip += 1
+                copy_earlier(dst, 1 + ((t >> 2) & 7) + (src[ip] << 3), (t >> 5) + 1)
+                ip += 1
             elif t >= 32:
                 count = t & 31
                 if count == 0:
                     count, ip = expand_zeroes(src, ip, 31)
                 t = src[ip]
-                copy_earlier(dst, 1 + ((t | (src[ip + 1] << 8)) >> 2), count + 2); ip += 2
+                copy_earlier(dst, 1 + ((t | (src[ip + 1] << 8)) >> 2), count + 2)
+                ip += 2
             elif t >= 16:
                 offset = (t & 8) << 11
                 count = t & 7
                 if count == 0:
                     count, ip = expand_zeroes(src, ip, 7)
                 t = src[ip]
-                offset += (t | (src[ip + 1] << 8)) >> 2; ip += 2
+                offset += (t | (src[ip + 1] << 8)) >> 2
+                ip += 2
                 if offset == 0:
                     return str(dst)
                 copy_earlier(dst, offset + 0x4000, count + 2)
             else:
-                copy_earlier(dst, 1 + (t >> 2) + (src[ip] << 2), 2); ip += 1
+                copy_earlier(dst, 1 + (t >> 2) + (src[ip] << 2), 2)
+                ip += 1
 
             t = t & 3
             if t == 0:
                 break
-            dst.extend(src[ip: ip + t]); ip += t
-            t = src[ip]; ip += 1
+            dst.extend(src[ip: ip + t])
+            ip += t
+            t = src[ip]
+            ip += 1
 
         while 1:
-            t = src[ip]; ip += 1
+            t = src[ip]
+            ip += 1
             if t < 16:
                 if t == 0:
                     t, ip = expand_zeroes(src, ip, 15)
-                dst.extend(src[ip: ip + t + 3]); ip += t + 3
-                t = src[ip]; ip += 1
+                dst.extend(src[ip: ip + t + 3])
+                ip += t + 3
+                t = src[ip]
+                ip += 1
             if t < 16:
-                copy_earlier(dst, 1 + 0x0800 + (t >> 2) + (src[ip] << 2), 3); ip += 1
+                copy_earlier(dst, 1 + 0x0800 + (t >> 2) + (src[ip] << 2), 3)
+                ip += 1
                 t = t & 3
                 if t == 0:
                     continue
-                dst.extend(src[ip: ip + t]); ip += t
-                t = src[ip]; ip += 1
+                dst.extend(src[ip: ip + t])
+                ip += t
+                t = src[ip]
+                ip += 1
             break
 
 
@@ -749,6 +803,7 @@ clz_table = (
     7, 17, 0, 25, 22, 31, 15, 29, 10, 12, 6, 0, 21, 14, 9, 5,
     20, 8, 19, 18
 )
+
 
 def lzo1x_1_compress_core(src, dst, ti, ip_start, ip_len):
     dict_entries = [0] * 16384
@@ -774,7 +829,8 @@ def lzo1x_1_compress_core(src, dst, ti, ip_start, ip_len):
                 break
             ip += 1 + ((ip - ii) >> 5)
 
-        ii -= ti; ti = 0
+        ii -= ti
+        ti = 0
         t = ip - ii
         if t != 0:
             if t <= 3:
@@ -841,6 +897,7 @@ def lzo1x_1_compress_core(src, dst, ti, ip_start, ip_len):
             dst.append((m_off << 2) & 0xff)
             dst.append((m_off >> 6) & 0xff)
 
+
 def lzo1x_1_compress(s):
     src = bytearray(s)
     dst = bytearray()
@@ -852,8 +909,8 @@ def lzo1x_1_compress(s):
     dst.append(240)
     dst.append((l >> 24) & 0xff)
     dst.append((l >> 16) & 0xff)
-    dst.append((l >>  8) & 0xff)
-    dst.append( l        & 0xff)
+    dst.append((l >> 8) & 0xff)
+    dst.append(l & 0xff)
 
     while l > 20 and t + l > 31:
         ll = min(49152, l)
@@ -889,7 +946,7 @@ def lzo1x_1_compress(s):
 def modify_save(data, changes, endian=1):
     player = read_protobuf(unwrap_player_data(data))
 
-    if changes.has_key("level"):
+    if ("level") in changes:
         level = int(changes["level"])
         lower = int(60 * (level ** 2.8) - 59.2)
         upper = int(60 * ((level + 1) ** 2.8) - 59.2)
@@ -897,7 +954,7 @@ def modify_save(data, changes, endian=1):
             player[3][0][1] = lower
         player[2] = [[0, int(changes["level"])]]
 
-    if changes.has_key("skillpoints"):
+    if ("skillpoints") in changes:
         player[4] = [[0, int(changes["skillpoints"])]]
 
     if any(map(changes.has_key, ("money", "eridium", "seraph", "tokens"))):
@@ -906,17 +963,17 @@ def modify_save(data, changes, endian=1):
         values = []
         while b.tell() < len(raw):
             values.append(read_protobuf_value(b, 0))
-        if changes.has_key("money"):
+        if ("money") in changes:
             values[0] = int(changes["money"])
-        if changes.has_key("eridium"):
+        if ("eridium") in changes:
             values[1] = int(changes["eridium"])
-        if changes.has_key("seraph"):
+        if ("seraph") in changes:
             values[2] = int(changes["seraph"])
-        if changes.has_key("tokens"):
+        if ("tokens") in changes:
             values[4] = int(changes["tokens"])
         player[6][0] = [0, values]
 
-    if changes.has_key("itemlevels"):
+    if ("itemlevels") in changes:
         if changes["itemlevels"]:
             level = int(changes["itemlevels"])
         else:
@@ -926,11 +983,11 @@ def modify_save(data, changes, endian=1):
                 field_data = read_protobuf(field[1])
                 is_weapon, item, key = unwrap_item(field_data[1][0][1])
                 if item[4] > 1:
-                    item = item[: 4] + [level, level] + item[6: ]
+                    item = item[: 4] + [level, level] + item[6:]
                     field_data[1][0][1] = wrap_item(is_weapon, item, key)
                     field[1] = write_protobuf(field_data)
 
-    if changes.has_key("backpack"):
+    if ("backpack") in changes:
         size = int(changes["backpack"])
         sdus = int(math.ceil((size - 12) / 3.0))
         size = 12 + (sdus * 3)
@@ -938,20 +995,20 @@ def modify_save(data, changes, endian=1):
         slots[1][0][1] = size
         player[13][0][1] = write_protobuf(slots)
         s = read_repeated_protobuf_value(player[36][0][1], 0)
-        player[36][0][1] = write_repeated_protobuf_value(s[: 7] + [sdus] + s[8: ], 0)
+        player[36][0][1] = write_repeated_protobuf_value(s[: 7] + [sdus] + s[8:], 0)
 
-    if changes.has_key("bank"):
+    if ("bank") in changes:
         size = int(changes["bank"])
         sdus = int(min(255, math.ceil((size - 6) / 2.0)))
         size = 6 + (sdus * 2)
-        if player.has_key(56):
+        if (56) in player:
             player[56][0][1] = size
         else:
             player[56] = [[0, size]]
         s = read_repeated_protobuf_value(player[36][0][1], 0)
         if len(s) < 9:
             s = s + (9 - len(s)) * [0]
-        player[36][0][1] = write_repeated_protobuf_value(s[: 8] + [sdus] + s[9: ], 0)
+        player[36][0][1] = write_repeated_protobuf_value(s[: 8] + [sdus] + s[9:], 0)
 
     if changes.get("gunslots", "0") in "234":
         n = int(changes["gunslots"])
@@ -961,11 +1018,11 @@ def modify_save(data, changes, endian=1):
             slots[3][0][1] = n - 2
         player[13][0][1] = write_protobuf(slots)
 
-    if changes.has_key("unlocks"):
+    if ("unlocks") in changes:
         unlocked, notifications = [], []
-        if player.has_key(23):
+        if (23) in player:
             unlocked = map(ord, player[23][0][1])
-        if player.has_key(24):
+        if (24) in player:
             notifications = map(ord, player[24][0][1])
         unlocks = changes["unlocks"].split(":")
         if "slaughterdome" in unlocks:
@@ -983,6 +1040,7 @@ def modify_save(data, changes, endian=1):
 
     return wrap_player_data(write_protobuf(player), endian)
 
+
 def export_items(data, output):
     player = read_protobuf(unwrap_player_data(data))
     for i, name in ((41, "Bank"), (53, "Items"), (54, "Weapons")):
@@ -996,6 +1054,7 @@ def export_items(data, output):
             code = "BL2(" + raw.encode("base64").strip() + ")"
             print >>output, code
 
+
 def import_items(data, codelist, endian=1):
     player = read_protobuf(unwrap_player_data(data))
 
@@ -1003,13 +1062,13 @@ def import_items(data, codelist, endian=1):
     for line in codelist.splitlines():
         line = line.strip()
         if line.startswith(";"):
-            name = line[1: ].strip().lower()
+            name = line[1:].strip().lower()
             if name == "bank":
                 to_bank = True
             elif name in ("items", "weapons"):
                 to_bank = False
             continue
-        elif line[: 4] + line[-1: ] != "BL2()":
+        elif line[: 4] + line[-1:] != "BL2()":
             continue
 
         code = line[4: -1]
@@ -1072,6 +1131,7 @@ def parse_args():
     )
     return p.parse_args()
 
+
 def main(options, args):
     if len(args) >= 2 and args[0] != "-" and args[0] == args[1]:
         print >>sys.stderr, "Cannot overwrite the save file, please use a different filename for the new save"
@@ -1118,7 +1178,7 @@ def main(options, args):
         player = input.read()
         if options.json:
             data = json.loads(player, encoding="latin1")
-            if not data.has_key("1"):
+            if not ("1") in data:
                 data = remove_structure(data, invert_structure(save_structure))
             player = write_protobuf(data)
         savegame = wrap_player_data(player, endian)
