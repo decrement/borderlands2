@@ -376,6 +376,7 @@ def apply_structure(pbdata, s):
             fields[mapping] = data[0][1]
             continue
         key, repeated, child_s = mapping
+
         if child_s is None:
             values = [d[1] for d in data]
             fields[key] = values if repeated else values[0]
@@ -392,6 +393,7 @@ def apply_structure(pbdata, s):
             fields[key] = values if repeated else values[0]
         else:
             raise Exception("Invalid mapping %r for %r: %r" % (mapping, k, data))
+
     if len(raw) != 0:
         fields["_raw"] = {}
         for k, values in raw.items():
@@ -1190,9 +1192,11 @@ if __name__ == "__main__":
         main(options, args)
     except:
         print >>sys.stderr, (
-            "Something went wrong, but please ensure you have the latest "
-            "version from https://github.com/pclifford/borderlands2 before "
-            "reporting a bug.  Information useful for a report follows:"
+            """
+            Something went wrong, but please ensure you have the latest
+            version from https://github.com/pclifford/borderlands2 before
+            reporting a bug.  Information useful for a report follows:
+            """
         )
         print >>sys.stderr, repr(sys.argv)
         raise
